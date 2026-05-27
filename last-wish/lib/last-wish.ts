@@ -1,5 +1,5 @@
 import { Contract, ContractFactory, ethers, JsonRpcProvider } from "ethers";
-import artifact from "../out/LastWish.sol/LastWish.json";
+import artifact from "./last-wish-artifact.json";
 import { networkConfig } from "./config";
 import type { LastWishSnapshot, WillStatus } from "./types";
 
@@ -24,7 +24,7 @@ const statusMap: WillStatus[] = [
 ];
 
 export const lastWishAbi = artifact.abi;
-export const lastWishBytecode = artifact.bytecode.object;
+export const lastWishBytecode = artifact.bytecode;
 
 export const shannonProvider = new JsonRpcProvider(networkConfig.rpcUrl, {
   chainId: networkConfig.chainId,
