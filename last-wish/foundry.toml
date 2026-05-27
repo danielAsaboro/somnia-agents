@@ -1,0 +1,22 @@
+[profile.default]
+src = "contracts"
+test = "test"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.28"
+optimizer = true
+optimizer_runs = 200
+evm_version = "paris"
+
+[rpc_endpoints]
+somnia_mainnet = "${SOMNIA_RPC_MAINNET}"
+somnia_testnet = "${SOMNIA_RPC_TESTNET}"
+
+[fmt]
+line_length = 100
+tab_width = 4
+bracket_spacing = true
+int_types = "long"
+multiline_func_header = "attributes_first"
+quote_style = "double"
+number_underscore = "thousands"
