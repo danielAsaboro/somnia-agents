@@ -1,80 +1,96 @@
 # Last Wish
 
-## One-Line Pitch
-Onchain wills that execute automatically when the LLM committee verifies your obituary appears across mainstream news domains, with optional milestone-conditional disbursements to heirs.
+Standalone Next 16 + TypeScript frontend for the `LastWish` contract in this directory. It is designed for Vercel deployment and talks directly to Somnia Shannon testnet through `ethers` and an injected EIP-1193 wallet.
 
-## The Shape
-- **Who funds:** The testator (you) deposits assets while alive.
-- **What event:** Death of testator (primary); heir life milestones (graduation, marriage, home purchase, child birth) for the Conditional Inheritance Trust variant.
-- **What Somnia agent verifies it:** `llm_parse_website` against N family-designated obituary URLs (NYT, Legacy.com, local paper, alumni org). Confidence threshold ≥ 0.95. Allowed values: ["confirmed", "not confirmed", "ambiguous"].
-- **What triggers:** Asset distribution (lump sum or milestone tranches), publication of final messages, release of pre-encrypted bundles, charity transfers.
+## What the UI does
 
-## Why This Was Impossible Before
-- Centralized "dead-man's switch" services depend on the service outliving the user.
-- Crypto guardianship requires trusted multisig — guardians collude, die, or disappear.
-- Legal trusts cost $10k+ to set up and require executor humans paid annually.
-- No oracle service is willing to take on "verify someone is dead" liability — the legal exposure on a false positive is enormous.
+- Deploy a new `LastWish` contract from the browser.
+- Load and manage any existing deployed `LastWish` contract on Shannon.
+- Show the contract lifecycle clearly: `Active`, `VerificationPending`, `Confirmed`, `Failed`, `Claimed`.
+- Surface the key estate-specific cautions: demo-only, no legal will substitute, obituary-verification risk.
 
-## How Somnia Specifically Enables It
-- Multiple validator GPUs reading the same obituary URLs return byte-identical "confirmed" verdicts → fork-resistant, undisputable.
-- Public chain-of-thought receipts → heirs can see exactly which URLs were checked, what HTML was parsed, what the verdict reasoning was.
-- The contract outlives the testator with mathematical certainty — no operator can shut it down.
-- Self-funding: testator deposits a small gas reserve at setup; contract uses it to pay for periodic verification requests.
-
-## V1 Demo Scope
-- Single testator, single beneficiary, single asset (STT)
-- One obituary URL pattern (e.g., Legacy.com search)
-- Manual trigger: anyone can call `verifyObituary()` after the testator is presumed dead
-- Lump sum payout on confirmation
-
-## V1++ Scope (Conditional Inheritance Trust)
-- Multiple beneficiaries with per-beneficiary milestone schedules
-- Each milestone has its own URL pattern + LLM question + min-confidence
-- Tranche release per verified milestone; unclaimed milestones eventually fall back to a default heir or charity
-
-## Sample Flow
-1. Testator deploys `LastWish` contract with `{ heirs[], milestones[], obituary_urls[], assets }`.
-2. Contract holds STT in escrow.
-3. Testator passes away.
-4. Anyone (typically an heir) calls `verifyObituary()`.
-5. Contract issues a Somnia `llm_parse_website` request to each obituary URL.
-6. Subcommittee of 5 validators each fetches HTML, classifies "is testator's obituary present?".
-7. Consensus = "confirmed" + confidence ≥ 0.95 → contract marks testator deceased.
-8. Distribution unlocks. Heir claims immediately (V1) or claims per milestone (V1++).
-
-## User Personas
-- Crypto-wealthy individuals without family lawyers.
-- Activists/journalists who want guaranteed-public posthumous statements.
-- Anyone burned by a slow probate process.
-- Sovereign individuals who don't trust any single legal jurisdiction.
-- Families with conditional-inheritance preferences (V1++).
-
-## Research Anchors
-- WikiLeaks "insurance file" pattern (precommitted-release crypto)
-- Vitalik on social recovery wallets
-- Sarcophagus DAO (failed because of trusted-node assumption)
-- Casa Inheritance (centralized service)
-- Estate-planning industry: $200B+/year in fees globally
-
-## Open Questions
-- Which obituary domains are most reliable and least Cloudflare-blocked?
-- How to handle false positives when same-name individuals die?
-- Should heirs submit additional evidence URLs before claim?
-- For V1++, how to handle milestones that never happen (timeout to fallback)?
-- Should there be a "challenge window" where the testator can prove they're still alive?
-
-## Implementation
-
-Self-contained Foundry project — shares no build state with NERVE or the other concepts.
+The Foundry contract remains the source of truth:
 
 - Contract: [`contracts/LastWish.sol`](./contracts/LastWish.sol)
 - Tests: [`test/LastWish.t.sol`](./test/LastWish.t.sol)
-- Build & test: `cd ideas/last-wish && forge build && forge test`
+- ABI used by the UI: [`out/LastWish.sol/LastWish.json`](./out/LastWish.sol/LastWish.json)
 
-V1 covers: single testator/heir, single obituary URL, ParseWebsite agent
-verification with allowed values `["confirmed", "not confirmed", "ambiguous"]`,
-lump-sum claim by heir, testator reset after failed verdict.
+## Local development
 
-## Status
-Concept draft v1 + working V1 scaffold, 2026-05-23
-# somnia-agents
+```bash
+cd ideas/last-wish
+pnpm install
+pnpm dev
+```
+
+Then open `http://localhost:3000`.
+
+## Environment variables
+
+Client config is public-only in v1. Copy `.env.example` to `.env.local` if needed.
+
+```bash
+NEXT_PUBLIC_DEFAULT_WILL_ADDRESS=
+NEXT_PUBLIC_SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network/
+NEXT_PUBLIC_SOMNIA_EXPLORER_URL=https://shannon-explorer.somnia.network/
+NEXT_PUBLIC_SOMNIA_CHAIN_ID=50312
+```
+
+Notes:
+
+- `NEXT_PUBLIC_DEFAULT_WILL_ADDRESS` is optional. Leave it blank if you do not want the manage panel to auto-load a contract.
+- If the RPC, explorer URL, or chain ID vars are missing, the UI falls back to Shannon defaults.
+- No server-side secrets are required for v1.
+
+## Point the UI at an existing deployed will
+
+Two options:
+
+1. Set `NEXT_PUBLIC_DEFAULT_WILL_ADDRESS` before running or deploying the app.
+2. Paste a deployed contract address into the manage panel at runtime.
+
+The UI reads:
+
+- `testator`
+- `heir`
+- `obituaryUrl`
+- `obituaryQuery`
+- `minConfidencePct`
+- `status`
+- `requestId`
+- `verdict`
+- `confirmedAt`
+- contract balance
+
+## Wallet and network behavior
+
+- Reads work through the public Shannon RPC, even with no wallet connected.
+- Writes require an injected wallet on Somnia Shannon testnet.
+- Wrong-network detection is built into the UI, with switch guidance for chain `50312`.
+
+## Vercel deployment
+
+Project settings:
+
+- Root Directory: `ideas/last-wish`
+- Install Command: `pnpm install`
+- Build Command: `pnpm build`
+- Output: default Next.js output
+
+No API routes, backend secrets, or custom server are required for this release.
+
+## Verification
+
+Static checks for the UI:
+
+```bash
+pnpm typecheck
+pnpm build
+```
+
+Contract checks remain available through Foundry:
+
+```bash
+forge build
+forge test
+```
