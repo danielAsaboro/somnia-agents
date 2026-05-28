@@ -134,6 +134,14 @@ function snapshotChanged(current: LastWishSnapshot, next: LastWishSnapshot) {
   );
 }
 
+const stateSequence: { key: WillStatus; copy: string }[] = [
+  { key: "Active", copy: "Funding open. Verification can be requested." },
+  { key: "VerificationPending", copy: "Deposit posted. Awaiting evidence verdict." },
+  { key: "Confirmed", copy: "Threshold cleared. Heir may release escrow." },
+  { key: "Failed", copy: "Verdict missed. Testator may reset the case." },
+  { key: "Claimed", copy: "Escrow released. Record remains public." },
+];
+
 export default function Home() {
   const [wallet, setWallet] = useState<WalletState>({
     availability: "checking",
@@ -174,8 +182,8 @@ export default function Home() {
   const walletMode = useMemo(() => {
     if (wallet.availability === "missing") {
       return {
-        label: "Read-only archive mode",
-        detail: "No injected wallet detected. Public reads still run over Shannon RPC.",
+        label: "Read-only mode",
+        detail: "No injected wallet detected. Public reads stay available over Shannon RPC.",
         tone: "warning" as const,
       };
     }
@@ -190,15 +198,15 @@ export default function Home() {
 
     if (wallet.connection === "connecting") {
       return {
-        label: "Opening the desk",
-        detail: "Waiting for wallet approval.",
+        label: "Awaiting wallet approval",
+        detail: "The desk is waiting on the signer.",
         tone: "default" as const,
       };
     }
 
     return {
-      label: "Wallet present, desk unopened",
-      detail: "Connect the wallet for deployments and writes.",
+      label: "Wallet available",
+      detail: "Connect to deploy or submit writes.",
       tone: "default" as const,
     };
   }, [wallet]);
@@ -208,7 +216,7 @@ export default function Home() {
       const next = normalizeWalletState({
         availability: "missing",
         connection: "disconnected",
-        message: "Read-only archive mode is active. Deployments and writes require an injected wallet.",
+        message: "Read-only mode is active. Deployments and writes require an injected wallet.",
       });
       setWallet((current) => (walletStateChanged(current, next) ? next : current));
       return;
@@ -228,7 +236,7 @@ export default function Home() {
               availability: "available",
               connection: "disconnected",
               chainId,
-              message: "A wallet is available. Connect it when you need to sign.",
+              message: "A wallet is available. Connect it when a write is required.",
             },
       );
       setWallet((current) => (walletStateChanged(current, next) ? next : current));
@@ -599,52 +607,61 @@ export default function Home() {
     }
   }
 
-  const evidenceCards = [
+  const executionFlow = [
     {
-      title: "Public reads stay open",
-      body: "Anyone can inspect the record from Shannon RPC, even when no wallet is present.",
-      icon: <ScrollText aria-hidden="true" size={18} />,
+      step: "01",
+      title: "Deploy",
+      gate: "Testator signs constructor",
+      output: "Parties, obituary source, query, threshold",
+      icon: <Fingerprint aria-hidden="true" size={16} />,
     },
     {
-      title: "Funding and verification are public",
-      body: "Any wallet can add STT or pay the request deposit while the case is Active.",
-      icon: <Landmark aria-hidden="true" size={18} />,
+      step: "02",
+      title: "Fund",
+      gate: "Any wallet while Active",
+      output: "Escrow balance increases in STT",
+      icon: <Landmark aria-hidden="true" size={16} />,
     },
     {
-      title: "Claim and reset are role-gated",
-      body: "Only the heir can claim a confirmed case. Only the testator can reset a failed one.",
-      icon: <Fingerprint aria-hidden="true" size={18} />,
+      step: "03",
+      title: "Verify",
+      gate: "Deposit posted to Somnia Agents",
+      output: "Request ID and verdict become visible",
+      icon: <ScrollText aria-hidden="true" size={16} />,
     },
     {
-      title: "This is a monitored escrow path",
-      body: "It records evidence flow. It does not pretend to replace probate, courts, or identity checks.",
-      icon: <ShieldAlert aria-hidden="true" size={18} />,
+      step: "04",
+      title: "Claim / reset",
+      gate: "Heir after Confirmed, testator after Failed",
+      output: "Escrow releases or record reopens",
+      icon: <ShieldAlert aria-hidden="true" size={16} />,
     },
   ];
 
   return (
     <main className="page-shell">
       <section className="hero-shell">
-        <div className="hero-noise" aria-hidden="true" />
-
-        <header className="masthead">
-          <div className="masthead-brand">
-            <p className="eyebrow">Somnia estate execution</p>
-            <span className="masthead-title">Last Wish</span>
+        <header className="topbar">
+          <div className="brand-lockup">
+            <p className="eyebrow">Somnia estate protocol</p>
+            <div className="brand-row">
+              <span className="brand-mark" aria-hidden="true" />
+              <span className="brand-name">Last Wish</span>
+            </div>
           </div>
 
-          <div className="masthead-actions">
-            <a className="ghost-button" href="#workspace">
-              Open the desk
+          <div className="topbar-actions">
+            <a className="button button-ghost" href="#workspace">
+              Open workspace
             </a>
             <button
-              className="primary-button"
+              className="button button-primary"
               type="button"
               onClick={connectWallet}
               disabled={wallet.connection === "connecting"}
               aria-busy={wallet.connection === "connecting"}
             >
-              <Wallet aria-hidden="true" size={18} />
+              <Wallet aria-hidden="true" size={16} />
               {wallet.connection === "connecting"
                 ? "Connecting..."
                 : wallet.connection === "connected"
@@ -656,66 +673,42 @@ export default function Home() {
 
         <div className="hero-grid">
           <section className="hero-copy">
-            <div className="section-rule" aria-hidden="true" />
-            <p className="eyebrow">Digital testament</p>
-            <h1>One blunt promise: funds do not move until the record does.</h1>
+            <p className="eyebrow">Obituary-triggered escrow</p>
+            <h1>Last Wish</h1>
             <p className="hero-lede">
-              Last Wish is an obituary-triggered escrow on Somnia. It names an heir, records the
-              verification question onchain, keeps the request deposit visible, and exposes every
-              state from first funding to final claim.
+              A Somnia escrow desk for inheritance records. It names the heir, stores the evidence
+              request, exposes the deposit, and blocks release until the public state changes.
             </p>
 
             <div className="hero-actions">
-              <a className="primary-link" href="#deploy-panel">
-                Open a case <ArrowRight aria-hidden="true" size={16} />
+              <a className="button button-primary" href="#deploy-panel">
+                Open a record <ArrowRight aria-hidden="true" size={16} />
               </a>
-              <a className="muted-link" href="#manage-panel">
+              <a className="button button-secondary" href="#manage-panel">
                 Load an existing record
               </a>
             </div>
 
-            <dl className="proof-strip">
-              <ProofItem label="Mode" value={walletMode.label} tone={walletMode.tone} />
-              <ProofItem
+            <dl className="signal-strip">
+              <SignalItem label="Mode" value={walletMode.label} tone={walletMode.tone} />
+              <SignalItem
                 label="Network"
                 value={`${networkConfig.name} (${networkConfig.chainId})`}
                 tone={walletOnWrongNetwork ? "warning" : "default"}
               />
-              <ProofItem
+              <SignalItem
                 label="Request deposit"
                 value={`${formatStt(networkConfig.requestDepositWei, 2)} STT`}
               />
-              <ProofItem
-                label="Case state"
-                value={liveStatus?.label ?? "No file loaded"}
+              <SignalItem
+                label="Loaded state"
+                value={liveStatus?.label ?? "No record loaded"}
                 tone={snapshot ? "signal" : "default"}
               />
             </dl>
           </section>
 
-          <section className="hero-stage" aria-label="Styled product preview">
-            <HeroPreview snapshot={snapshot} role={role} walletMode={walletMode.label} />
-            <aside className="hero-rail">
-              <PreviewSlip
-                kicker="Setup frame"
-                title="Deploy with constructor evidence"
-                lines={[
-                  "Heir address, obituary URL, and query are written directly from the wallet.",
-                  "Optional opening escrow is attached at deployment.",
-                ]}
-              />
-              <PreviewSlip
-                kicker="Live frame"
-                title="Activity remains auditable"
-                lines={[
-                  snapshot
-                    ? `Latest status: ${statusCopy[snapshot.status].label}.`
-                    : "Load a case to read balance, verdict, and request ID.",
-                  "Transaction hashes stay visible in the desk below.",
-                ]}
-              />
-            </aside>
-          </section>
+          <ProductScreenshot snapshot={snapshot} role={role} walletMode={walletMode.label} />
         </div>
 
         <div className="notice-stack" aria-live="polite">
@@ -725,7 +718,7 @@ export default function Home() {
               title="Wrong network selected"
               body={`Connected wallet is on chain ${wallet.chainId}. Writes require ${networkConfig.name} (${networkConfig.chainId}).`}
               action={
-                <button className="secondary-button" type="button" onClick={handleSwitchNetwork}>
+                <button className="button button-secondary" type="button" onClick={handleSwitchNetwork}>
                   Switch to Shannon
                 </button>
               }
@@ -734,77 +727,130 @@ export default function Home() {
           {wallet.message && !walletOnWrongNetwork && (
             <Banner tone="neutral" title={walletMode.label} body={wallet.message} />
           )}
-          {notice && <Banner tone="success" title="Desk update" body={notice} />}
+          {notice && <Banner tone="success" title="Workspace update" body={notice} />}
           {errorBanner && <Banner tone="error" title="Action blocked" body={errorBanner} />}
         </div>
 
-        <section className="thesis-grid">
-          <article className="thesis-panel thesis-panel-wide">
-            <p className="eyebrow">What it does</p>
-            <h2>It treats the will like an evidence file, not a magic payout button.</h2>
-            <p>
-              The contract names parties, holds STT in escrow, records the obituary source and
-              confidence floor, and waits for an explicit verification request before any release.
-            </p>
+        <section className="protocol-map" aria-label="Protocol state and evidence map">
+          <article className="protocol-board">
+            <div className="panel-headline-row">
+              <div>
+                <PanelKicker label="Protocol map" />
+                <h2>One contract file. Every gate exposed.</h2>
+              </div>
+              <div className="board-current">
+                <span>Loaded state</span>
+                {snapshot ? <StatusPill status={snapshot.status} /> : <CaseTag label="Idle" />}
+              </div>
+            </div>
+
+            <div className="state-map">
+              {stateSequence.map((item) => (
+                <div
+                  className="state-node"
+                  data-active={snapshot?.status === item.key}
+                  key={item.key}
+                >
+                  <span className="state-node-dot" aria-hidden="true" />
+                  <strong>{statusCopy[item.key].label}</strong>
+                  <p>{item.copy}</p>
+                </div>
+              ))}
+            </div>
           </article>
 
-          <article className="thesis-panel">
-            <p className="eyebrow">What it refuses</p>
-            <h3>No claims of legal finality.</h3>
-            <p>
-              This interface does not pretend to settle inheritance law. It surfaces a testnet
-              release path with public evidence and hard role gates.
-            </p>
-          </article>
+          <aside className="evidence-console">
+            <div className="evidence-panel">
+              <PanelKicker label="Role matrix" />
+              <h3>Writers are explicit.</h3>
+              <div className="role-matrix">
+                <MatrixRow actor="Any wallet" action="Fund / verify" gate="Active" />
+                <MatrixRow actor="Heir" action="Claim" gate="Confirmed" />
+                <MatrixRow actor="Testator" action="Reset" gate="Failed" />
+              </div>
+            </div>
 
-          <article className="thesis-panel">
-            <p className="eyebrow">Operational truth</p>
-            <h3>Every write comes from the wallet.</h3>
-            <p>
-              No relayer, no hidden signer, no private backend operator. Reads stay public. Writes
-              stay explicit.
-            </p>
-          </article>
+            <div className="evidence-panel evidence-panel-inset">
+              <PanelKicker label="Evidence ledger" />
+              <MetricPair label="Role" value={role} />
+              <MetricPair
+                label="Escrow"
+                value={snapshot ? `${formatStt(snapshot.balanceWei, 2)} STT` : "No balance loaded"}
+              />
+              <MetricPair
+                label="Request"
+                value={snapshot ? (snapshot.requestId === "0" ? "Not requested" : "Recorded") : "Idle"}
+              />
+              <MetricPair
+                label="Verdict"
+                value={snapshot ? snapshot.verdict || "Awaiting verdict" : "No verdict"}
+              />
+            </div>
+          </aside>
         </section>
 
-        <section className="evidence-gallery" aria-label="Mechanics and proof">
-          {evidenceCards.map((item) => (
-            <article className="evidence-card" key={item.title}>
-              <div className="evidence-card-head">
-                <span className="evidence-icon">{item.icon}</span>
-                <p className="evidence-kicker">Mechanics</p>
-              </div>
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-            </article>
-          ))}
+        <section className="execution-shell" aria-label="Mechanism overview">
+          <div className="mechanism-copy">
+            <p className="eyebrow">Execution path</p>
+            <h2>Records first. Money only moves through state.</h2>
+            <p>
+              The interface keeps the write path narrow: deploy the file, fund the escrow, post the
+              verification deposit, then release or reopen only when the contract state allows it.
+            </p>
+          </div>
+
+          <div className="execution-flow">
+            {executionFlow.map((item, index) => (
+              <article className="flow-step" key={item.title}>
+                <div className="flow-step-head">
+                  <span className="mechanism-icon">{item.icon}</span>
+                  <span className="flow-step-index">{item.step}</span>
+                </div>
+                <h3>{item.title}</h3>
+                <dl>
+                  <div>
+                    <dt>Gate</dt>
+                    <dd>{item.gate}</dd>
+                  </div>
+                  <div>
+                    <dt>Output</dt>
+                    <dd>{item.output}</dd>
+                  </div>
+                </dl>
+                {index < executionFlow.length - 1 && (
+                  <ArrowRight className="flow-arrow" aria-hidden="true" size={18} />
+                )}
+              </article>
+            ))}
+          </div>
         </section>
       </section>
 
       <section className="workspace-shell" id="workspace">
         <div className="workspace-header">
           <div>
-            <p className="eyebrow">Operations desk</p>
-            <h2>The ceremonial language stops here. This is the control room.</h2>
+            <p className="eyebrow">Operational workspace</p>
+            <h2>Deploy, inspect, fund, verify, release.</h2>
           </div>
-          <p>
-            Use the desk to deploy, point at an existing contract, add escrow, trigger
-            verification, and move through role-gated release or reset paths.
-          </p>
+          <div className="workspace-summary">
+            <SummaryPill label="Wallet" value={walletMode.label} />
+            <SummaryPill label="Role" value={role} />
+            <SummaryPill label="State" value={liveStatus?.label ?? "Idle"} />
+          </div>
         </div>
 
         <div className="workspace-grid">
           <div className="workspace-column">
-            <section className="desk-panel" id="deploy-panel">
+            <section className="control-panel" id="deploy-panel">
               <PanelHeading
-                eyebrow="Open a case"
-                title="Draft the estate record"
-                body="Constructor values are written directly by the connected wallet and preserved onchain."
+                eyebrow="Create record"
+                title="Write constructor inputs onchain"
+                body="The connected wallet deploys the contract, sets the evidence source, names the heir, and may attach opening escrow."
               />
 
               <form className="control-form" onSubmit={handleDeploy}>
                 <fieldset className="field-group">
-                  <legend>Parties and source</legend>
+                  <legend>Actors and source</legend>
                   <TextField
                     id="heir"
                     label="Heir address"
@@ -823,7 +869,7 @@ export default function Home() {
                     value={deployForm.obituaryUrl}
                     onChange={(value) => setDeployForm((current) => ({ ...current, obituaryUrl: value }))}
                     placeholder="https://..."
-                    helper="Public page or search result the verification agent should inspect."
+                    helper="Public source the verification agent should inspect."
                     error={deployErrors.obituaryUrl}
                     autoComplete="url"
                     spellCheck={false}
@@ -861,7 +907,7 @@ export default function Home() {
                       setDeployForm((current) => ({ ...current, initialEscrowAmount: value }))
                     }
                     placeholder="10.0"
-                    helper="Optional. Leave blank to open the case unfunded."
+                    helper="Optional. Leave blank to deploy unfunded."
                     error={deployErrors.initialEscrowAmount}
                     inputMode="decimal"
                     spellCheck={false}
@@ -870,25 +916,25 @@ export default function Home() {
 
                 <div className="form-footer">
                   <button
-                    className="primary-button"
+                    className="button button-primary"
                     type="submit"
                     disabled={wallet.connection === "connecting" || walletOnWrongNetwork}
                     aria-busy={wallet.connection === "connecting"}
                   >
-                    Deploy estate record
+                    Deploy record
                   </button>
                   <p className="footnote">
-                    Uses <code>out/LastWish.sol/LastWish.json</code> from the current workspace.
+                    Uses <code>out/LastWish.sol/LastWish.json</code> from this workspace.
                   </p>
                 </div>
               </form>
             </section>
 
-            <section className="desk-panel desk-panel-ink">
+            <section className="control-panel control-panel-muted">
               <PanelHeading
-                eyebrow="Proof strip"
+                eyebrow="System constants"
                 title="Network and integration facts"
-                body="These constants shape every state in the desk."
+                body="These values define the request surface and explorer path for every record."
               />
 
               <dl className="ledger-grid">
@@ -913,7 +959,7 @@ export default function Home() {
                   label="Platform"
                   value={
                     <button
-                      className="inline-copy"
+                      className="inline-control"
                       type="button"
                       onClick={() => void copyText(networkConfig.platformAddress, "Platform address")}
                     >
@@ -927,11 +973,11 @@ export default function Home() {
           </div>
 
           <div className="workspace-column">
-            <section className="desk-panel" id="manage-panel">
+            <section className="control-panel" id="manage-panel">
               <PanelHeading
-                eyebrow="Load a record"
-                title="Point the desk at an existing will"
-                body="Paste a deployed Shannon address to read the file and unlock the right actions."
+                eyebrow="Load record"
+                title="Point the workspace at a deployed contract"
+                body="Read the current status, role gates, escrow balance, evidence inputs, and release readiness from one address."
               />
 
               <form className="address-form" onSubmit={handleLoadWill}>
@@ -947,12 +993,12 @@ export default function Home() {
                   spellCheck={false}
                 />
                 <div className="address-actions">
-                  <button className="primary-button" type="submit">
-                    Read the record
+                  <button className="button button-primary" type="submit">
+                    Read record
                   </button>
                   {loadedAddress && (
                     <button
-                      className="secondary-button"
+                      className="button button-secondary"
                       type="button"
                       onClick={() => void loadSnapshot(loadedAddress)}
                     >
@@ -966,20 +1012,23 @@ export default function Home() {
               {snapshotState.phase === "idle" && (
                 <StateCard
                   tone="neutral"
-                  title="No will loaded yet"
-                  body="Open a case above or point the desk at a deployed address."
+                  title="No record loaded"
+                  body="Deploy above or point this workspace at a deployed address."
                   icon={<Link2 aria-hidden="true" size={18} />}
                 />
               )}
 
               {snapshotState.phase === "loading" && (
-                <SnapshotSkeleton title="Reading the estate record" subtitle="Pulling the latest state from Shannon." />
+                <SnapshotSkeleton
+                  title="Reading the record"
+                  subtitle="Pulling the latest state from Shannon."
+                />
               )}
 
               {snapshotState.phase === "error" && (
                 <StateCard
                   tone="error"
-                  title="Couldn't read this will"
+                  title="Couldn't read this record"
                   body={snapshotState.message}
                   icon={<AlertTriangle aria-hidden="true" size={18} />}
                   actionLabel={snapshotState.address ? "Retry" : undefined}
@@ -990,8 +1039,8 @@ export default function Home() {
               )}
 
               {snapshot && (
-                <div className="dossier">
-                  <div className="dossier-head">
+                <div className="record-dossier">
+                  <div className="record-dossier-head">
                     <div>
                       <p className="eyebrow">Loaded file</p>
                       <h3>{shortAddress(snapshot.contractAddress, 10, 6)}</h3>
@@ -1013,7 +1062,7 @@ export default function Home() {
                     />
                     <AddressRecord label="Testator" value={snapshot.testator} onCopy={copyText} />
                     <AddressRecord label="Heir" value={snapshot.heir} onCopy={copyText} />
-                    <EvidenceRecord label="Balance" value={`${formatStt(snapshot.balanceWei)} STT`} />
+                    <EvidenceRecord label="Escrow balance" value={`${formatStt(snapshot.balanceWei)} STT`} />
                     <EvidenceRecord label="Min confidence" value={`${snapshot.minConfidencePct}%`} />
                     <EvidenceRecord label="Confirmed at" value={formatDateTime(snapshot.confirmedAt)} />
                     <EvidenceRecord label="Obituary URL" value={snapshot.obituaryUrl} />
@@ -1029,17 +1078,17 @@ export default function Home() {
               )}
             </section>
 
-            <section className="desk-panel">
+            <section className="control-panel">
               <PanelHeading
                 eyebrow="Action bay"
-                title="Use the right role at the right status"
-                body="The contract behavior is unchanged. The desk only exposes the gates more clearly."
+                title="Run the permitted write"
+                body="The contract behavior is unchanged. The workspace only makes the gate conditions legible."
               />
 
               {!snapshot ? (
                 <StateCard
                   tone="neutral"
-                  title="No active file in the bay"
+                  title="No active record"
                   body="Load a contract first. Funding, verification, claim, and reset all depend on a live record."
                   icon={<ScrollText aria-hidden="true" size={18} />}
                 />
@@ -1053,7 +1102,7 @@ export default function Home() {
                       </div>
                       <ActionState
                         enabled={snapshot.status === "Active"}
-                        reason="Funding is only open while the case is Active."
+                        reason="Funding is only open while the record is Active."
                       />
                     </div>
                     <TextField
@@ -1067,7 +1116,7 @@ export default function Home() {
                       spellCheck={false}
                     />
                     <button
-                      className="primary-button"
+                      className="button button-primary"
                       type="submit"
                       disabled={snapshot.status !== "Active" || walletOnWrongNetwork}
                     >
@@ -1083,7 +1132,7 @@ export default function Home() {
                       </div>
                       <ActionState
                         enabled={snapshot.status === "Active"}
-                        reason="Verification can only begin from Active."
+                        reason="Verification begins only from Active."
                       />
                     </div>
                     <TextField
@@ -1107,7 +1156,7 @@ export default function Home() {
                       spellCheck={false}
                     />
                     <button
-                      className="primary-button"
+                      className="button button-primary"
                       type="submit"
                       disabled={snapshot.status !== "Active" || walletOnWrongNetwork}
                     >
@@ -1123,15 +1172,15 @@ export default function Home() {
                       </div>
                       <ActionState
                         enabled={snapshot.status === "Confirmed" && role === "Heir"}
-                        reason="Only the heir can claim, and only after confirmation."
+                        reason="Only the heir may claim after confirmation."
                       />
                     </div>
                     <p className="action-copy">
-                      Connected role resolves to <strong>{role}</strong>. Release remains sealed until
-                      the verdict is Confirmed.
+                      Connected role resolves to <strong>{role}</strong>. Release remains blocked
+                      until the verdict is `Confirmed`.
                     </p>
                     <button
-                      className="primary-button"
+                      className="button button-primary"
                       type="button"
                       onClick={() => void handleClaim()}
                       disabled={snapshot.status !== "Confirmed" || role !== "Heir" || walletOnWrongNetwork}
@@ -1148,14 +1197,14 @@ export default function Home() {
                       </div>
                       <ActionState
                         enabled={snapshot.status === "Failed" && role === "Testator"}
-                        reason="Only the testator can reset, and only after failure."
+                        reason="Only the testator may reset after failure."
                       />
                     </div>
                     <p className="action-copy">
-                      Use reset after an ambiguous or rejected verdict to return the file to Active.
+                      Reset returns the record to `Active` after an ambiguous or rejected verdict.
                     </p>
                     <button
-                      className="secondary-button"
+                      className="button button-secondary"
                       type="button"
                       onClick={() => void handleReset()}
                       disabled={snapshot.status !== "Failed" || role !== "Testator" || walletOnWrongNetwork}
@@ -1167,18 +1216,18 @@ export default function Home() {
               )}
             </section>
 
-            <section className="desk-panel">
+            <section className="control-panel">
               <PanelHeading
-                eyebrow="Docket"
-                title="Wallet actions and chain progress"
+                eyebrow="Transaction feed"
+                title="Track wallet signatures and chain confirmations"
                 body="Every write moves through signature, submission, confirmation, or failure."
               />
 
               {txFeed.length === 0 ? (
                 <StateCard
                   tone="neutral"
-                  title="No chain actions logged yet"
-                  body="Deployments and contract writes will appear here with hashes and outcomes."
+                  title="No chain actions logged"
+                  body="Deployments and writes will appear here with hashes and outcomes."
                   icon={<Wallet aria-hidden="true" size={18} />}
                 />
               ) : (
@@ -1202,7 +1251,7 @@ export default function Home() {
                         {tx.hash && (
                           <div className="timeline-links">
                             <button
-                              className="inline-copy"
+                              className="inline-control"
                               type="button"
                               onClick={() => void copyText(tx.hash as string, "Transaction hash")}
                             >
@@ -1231,6 +1280,14 @@ export default function Home() {
             </section>
           </div>
         </div>
+
+        <section className="caution-strip" aria-label="Operational caveat">
+          <p className="eyebrow">Boundary</p>
+          <p>
+            Last Wish exposes a public escrow workflow with role gates and evidence state. It does
+            not represent probate, legal finality, or identity adjudication.
+          </p>
+        </section>
       </section>
     </main>
   );
@@ -1243,7 +1300,7 @@ function humanTxStatus(tx: PendingTx) {
   return "Failed before completion.";
 }
 
-function ProofItem({
+function SignalItem({
   label,
   tone = "default",
   value,
@@ -1253,14 +1310,14 @@ function ProofItem({
   value: string;
 }) {
   return (
-    <div className="proof-item" data-tone={tone}>
+    <div className="signal-item" data-tone={tone}>
       <dt>{label}</dt>
       <dd>{value}</dd>
     </div>
   );
 }
 
-function HeroPreview({
+function ProductScreenshot({
   snapshot,
   role,
   walletMode,
@@ -1269,87 +1326,154 @@ function HeroPreview({
   role: "Testator" | "Heir" | "Viewer";
   walletMode: string;
 }) {
-  const status = snapshot ? statusCopy[snapshot.status].label : "Awaiting first case";
+  const status = snapshot ? statusCopy[snapshot.status].label : "No record loaded";
+  const contractLabel = snapshot ? shortAddress(snapshot.contractAddress, 10, 6) : "0x7A91...D4C2";
+  const testatorLabel = snapshot ? shortAddress(snapshot.testator, 8, 6) : "Wallet signer";
+  const heirLabel = snapshot ? shortAddress(snapshot.heir, 8, 6) : "Named heir";
+  const escrowLabel = snapshot ? `${formatStt(snapshot.balanceWei, 2)} STT` : "0.00 STT";
+  const requestLabel = snapshot
+    ? snapshot.requestId === "0"
+      ? "Not requested"
+      : `#${snapshot.requestId}`
+    : "Ready";
 
   return (
-    <div className="hero-frame">
-      <div className="hero-frame-plaque">
-        <span>Status</span>
-        <strong>{status}</strong>
-      </div>
+    <section className="product-shot" aria-label="Last Wish application screen">
+      <div className="shot-chrome">
+        <div className="shot-rail" aria-hidden="true">
+          <span>LW</span>
+          <i />
+          <i />
+          <i />
+        </div>
 
-      <div className="hero-frame-header">
-        <div>
-          <p className="eyebrow">Case file preview</p>
-          <h2>{snapshot ? shortAddress(snapshot.contractAddress, 10, 6) : "Estate release protocol"}</h2>
-        </div>
-        <div className="badge-row">
-          {snapshot ? <StatusPill status={snapshot.status} /> : <CaseTag label="Shannon desk" />}
-          {snapshot ? <RolePill role={role} /> : <CaseTag label="Wallet-routed" />}
-        </div>
-      </div>
+        <div className="shot-main">
+          <div className="shot-topbar">
+            <div>
+              <p className="screen-label">Estate record</p>
+              <strong>{contractLabel}</strong>
+            </div>
+            <div className="screen-state">
+              <span>{status}</span>
+              <span>{networkConfig.name}</span>
+            </div>
+          </div>
 
-      <div className="hero-frame-grid">
-        <PreviewStat
-          label="Beneficiary"
-          value={snapshot ? shortAddress(snapshot.heir, 8, 6) : "Named at deployment"}
-        />
-        <PreviewStat
-          label="Testator"
-          value={snapshot ? shortAddress(snapshot.testator, 8, 6) : "Wallet-originated"}
-        />
-        <PreviewStat
-          label="Escrow"
-          value={snapshot ? `${formatStt(snapshot.balanceWei, 2)} STT` : "Opens unfunded or funded"}
-        />
-        <PreviewStat
-          label="Verification path"
-          value={snapshot ? (snapshot.requestId === "0" ? "Not yet triggered" : "Request recorded") : "URL + query onchain"}
-        />
-      </div>
+          <div className="shot-content">
+            <div className="screen-left">
+              <div className="state-track">
+                {stateSequence.map((item, index) => (
+                  <div className="track-row" data-active={snapshot?.status === item.key} key={item.key}>
+                    <span className="track-index">{String(index + 1).padStart(2, "0")}</span>
+                    <span>{statusCopy[item.key].label}</span>
+                  </div>
+                ))}
+              </div>
 
-      <div className="hero-frame-ledger">
-        <div>
-          <span>Readiness</span>
-          <strong>{snapshot ? statusCopy[snapshot.status].signal : "Waiting for the first estate record."}</strong>
-        </div>
-        <div>
-          <span>Wallet</span>
-          <strong>{walletMode}</strong>
+              <div className="release-gate">
+                <span className="screen-label">Release gate</span>
+                <strong>{snapshot ? statusCopy[snapshot.status].signal : "Waiting for a loaded record."}</strong>
+                <div className="gate-bars" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </div>
+              </div>
+            </div>
+
+            <div className="screen-center">
+              <div className="screen-table">
+                <div className="table-row table-head">
+                  <span>Field</span>
+                  <span>Value</span>
+                  <span>State</span>
+                </div>
+                <ScreenRow label="Testator" value={testatorLabel} state="Origin" />
+                <ScreenRow label="Heir" value={heirLabel} state={role === "Heir" ? "Signer" : "Locked"} />
+                <ScreenRow label="Escrow" value={escrowLabel} state="Held" />
+                <ScreenRow label="Request" value={requestLabel} state={snapshot?.requestId === "0" ? "Idle" : "Posted"} />
+                <ScreenRow
+                  label="Verdict"
+                  value={snapshot?.verdict || "Awaiting verdict"}
+                  state={snapshot?.status === "Confirmed" ? "Cleared" : "Blocked"}
+                />
+              </div>
+            </div>
+
+            <div className="screen-right">
+              <div className="action-stack">
+                <span className="screen-label">Action bay</span>
+                <ScreenAction label="Fund" enabled={!snapshot || snapshot.status === "Active"} />
+                <ScreenAction label="Verify" enabled={!snapshot || snapshot.status === "Active"} />
+                <ScreenAction label="Claim" enabled={snapshot?.status === "Confirmed" && role === "Heir"} />
+                <ScreenAction label="Reset" enabled={snapshot?.status === "Failed" && role === "Testator"} />
+              </div>
+
+              <div className="screen-metrics">
+                <MetricPair label="Wallet mode" value={walletMode} />
+                <MetricPair
+                  label="Request deposit"
+                  value={`${formatStt(snapshot?.requestDepositWei ?? networkConfig.requestDepositWei, 2)} STT`}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+    </section>
+  );
+}
+
+function ScreenRow({ label, state, value }: { label: string; state: string; value: string }) {
+  return (
+    <div className="table-row">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <em>{state}</em>
     </div>
   );
 }
 
-function PreviewStat({ label, value }: { label: string; value: string }) {
+function ScreenAction({ enabled, label }: { enabled: boolean; label: string }) {
   return (
-    <article className="preview-stat">
+    <div className="screen-action" data-enabled={enabled}>
       <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
+      <strong>{enabled ? "Ready" : "Blocked"}</strong>
+    </div>
   );
 }
 
-function PreviewSlip({
-  kicker,
-  lines,
-  title,
-}: {
-  kicker: string;
-  lines: string[];
-  title: string;
-}) {
+function MetricPair({ label, value }: { label: string; value: string }) {
   return (
-    <article className="preview-slip">
-      <p className="eyebrow">{kicker}</p>
-      <h3>{title}</h3>
-      <ul>
-        {lines.map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ul>
-    </article>
+    <div className="metric-pair">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function PanelKicker({ label }: { label: string }) {
+  return <p className="panel-kicker">{label}</p>;
+}
+
+function SummaryPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="summary-pill">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function MatrixRow({ actor, action, gate }: { actor: string; action: string; gate: string }) {
+  return (
+    <div className="matrix-row">
+      <span>{actor}</span>
+      <strong>{action}</strong>
+      <em>{gate}</em>
+    </div>
   );
 }
 
@@ -1502,7 +1626,7 @@ function AddressRecord({
         {shortAddress(value, 10, 6)}
       </strong>
       <div className="record-actions">
-        <button className="inline-copy" type="button" onClick={() => void onCopy(value, label)}>
+        <button className="inline-control" type="button" onClick={() => void onCopy(value, label)}>
           <Copy aria-hidden="true" size={14} />
           Copy
         </button>
@@ -1554,7 +1678,7 @@ function StateCard({
         <strong>{title}</strong>
         <p>{body}</p>
         {actionLabel && onAction && (
-          <button className="secondary-button" type="button" onClick={onAction}>
+          <button className="button button-secondary state-card-button" type="button" onClick={onAction}>
             {actionLabel}
           </button>
         )}

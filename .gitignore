@@ -6,3 +6,4 @@ grant-vesting/
 cve-bounty/
 achievement-bounty/
 .env
+**/submission.md
